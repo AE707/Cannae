@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cannae - AI Command Center</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Cannae AI Command Center</h1>
+            <p>Outthink larger forces through superior preparation and memory</p>
+        </header>
+
+        <main>
+            <section id="council-interface">
+                <div id="agent-selector">
+                    <label for="agent-choice">Select Agent:</label>
+                    <select id="agent-choice">
+                        <option value="ceo">CEO Agent</option>
+                        <option value="coach">Coach Agent</option>
+                    </select>
+                </div>
+
+                <div id="chat-interface">
+                    <div id="messages">
+                        <!-- Messages will be inserted here -->
+                    </div>
+                    <form id="chat-form">
+                        <textarea id="message-input" placeholder="Type your message here..."></textarea>
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
+
+                <div id="memory-sidebar">
+                    <h3>Memory Context</h3>
+                    <div id="memory-content">
+                        <!-- Memory context will be inserted here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Cannae - AI Business Operating System &copy; 2026</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/council.js"></script>
+</body>
+</html>
