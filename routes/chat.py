@@ -1,12 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import json
 
-from agents.ceo_agent import CEOAgent
-from agents.coach_agent import CoachAgent
-from agents.seo_agent import SEOSAgent
-from agents.cfo_agent import CFOAgent
+from agents import get_agent, AGENT_REGISTRY, AGENT_DESCRIPTIONS
 from core.config import get_settings
 from memory.memory_layer import MemoryLayer
 
@@ -33,19 +29,7 @@ async def chat_endpoint(request: ChatRequest):
         settings = get_settings()
         memory_layer = MemoryLayer(settings)
 
-        if request.agent_type.lower() == "ceo":
-            agent = CEOAgent(memory_layer, settings)
-        elif request.agent_type.lower() == "coach":
-            agent = CoachAgent(memory_layer, settings)
-        elif request.agent_type.lower() == "seo":
-            agent = SEOSAgent(memory_layer, settings)
-        elif request.agent_type.lower() == "cfo":
-            agent = CFOAgent(memory_layer, settings)
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid agent_type: {request.agent_type}. Must be 'ceo', 'coach', 'seo', or 'cfo'",
-            )
+        agent = get_agent(request.agent_type.lower(), memory_layer, settings)
 
         response = await agent.invoke(
             request.user_id,
@@ -57,6 +41,8 @@ async def chat_endpoint(request: ChatRequest):
             response=response,
             agent_used=request.agent_type,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -65,11 +51,6 @@ async def chat_endpoint(request: ChatRequest):
 async def list_agents():
     """List available agents."""
     return {
-        "agents": ["ceo", "coach", "seo", "cfo"],
-        "descriptions": {
-            "ceo": "Strategic advisor focused on high-leverage decisions",
-            "coach": "Accountability partner focused on goal tracking and follow-through",
-            "seo": "Search engine optimization and content strategy specialist",
-            "cfo": "Financial analysis and strategic finance specialist",
-        },
+        "agents": list(AGENT_REGISTRY.keys()),
+        "descriptions": AGENT_DESCRIPTIONS,
     }

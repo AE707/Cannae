@@ -22,7 +22,7 @@ def test_imports():
         return False
 
     try:
-        from core.constants import CLAUDE_MODEL, MAX_TOKENS, CEO_AGENT, COACH_AGENT
+        from core.constants import CLAUDE_MODEL, MAX_TOKENS, AgentId
         print("[OK] core.constants imported")
     except Exception as e:
         print(f"[FAIL] core.constants import failed: {e}")
