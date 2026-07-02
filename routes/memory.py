@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+import logging
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
-import json
 
 from core.config import get_settings
+from core.auth import require_auth
+from core.validation import validate_user_id
 from memory.memory_layer import MemoryLayer
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/memory", tags=["memory"])
 
@@ -15,6 +18,11 @@ class MemoryAddRequest(BaseModel):
     content: str
     agent_id: str
     metadata: Optional[Dict[str, Any]] = {}
+
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
 
 
 class MemoryAddResponse(BaseModel):
@@ -26,13 +34,21 @@ class MemorySearchRequest(BaseModel):
     query: str
     n_results: Optional[int] = 5
 
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
+
 
 class MemorySearchResponse(BaseModel):
     results: List[Dict[str, Any]]
 
 
 @router.post("/add", response_model=MemoryAddResponse)
-async def add_memory(request: MemoryAddRequest):
+async def add_memory(
+    request: MemoryAddRequest,
+    token_payload: dict = Depends(require_auth),
+):
     """Add a memory entry."""
     try:
         settings = get_settings()
@@ -45,12 +61,16 @@ async def add_memory(request: MemoryAddRequest):
         )
 
         return MemoryAddResponse(doc_id=doc_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("add_memory failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/search", response_model=MemorySearchResponse)
-async def search_memory(request: MemorySearchRequest):
+async def search_memory(
+    request: MemorySearchRequest,
+    token_payload: dict = Depends(require_auth),
+):
     """Search memory entries."""
     try:
         settings = get_settings()
@@ -60,24 +80,27 @@ async def search_memory(request: MemorySearchRequest):
             query=request.query,
         )
 
-        # Combine semantic and graph results for simplicity
         results = []
         results.extend(memory_data.get("semantic", []))
         results.extend(memory_data.get("graph", []))
 
         return MemorySearchResponse(results=results[: request.n_results or 5])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("search_memory failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats/{user_id}")
-async def get_memory_stats(user_id: str):
+async def get_memory_stats(
+    user_id: str,
+    token_payload: dict = Depends(require_auth),
+):
     """Get memory statistics for a user."""
+    validate_user_id(user_id)
     try:
         settings = get_settings()
         memory_layer = MemoryLayer(settings)
 
-        # Get memory data to calculate stats
         memory_data = await memory_layer.read(user_id=user_id, query="")
 
         return {
@@ -86,20 +109,23 @@ async def get_memory_stats(user_id: str):
             "graph_memory_entries": len(memory_data.get("graph", [])),
             "total_entries": len(memory_data.get("semantic", [])) + len(memory_data.get("graph", [])),
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("get_memory_stats failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/{user_id}")
-async def clear_user_memory(user_id: str):
+async def clear_user_memory(
+    user_id: str,
+    token_payload: dict = Depends(require_auth),
+):
     """Clear all memory for a user."""
+    validate_user_id(user_id)
     try:
-        # Note: This would require implementing clear methods in memory layers
-        # For now, we'll return a placeholder response
-
         return {
             "message": f"Memory clear not fully implemented for user {user_id}",
             "user_id": user_id,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("clear_user_memory failed")
+        raise HTTPException(status_code=500, detail="Internal server error")

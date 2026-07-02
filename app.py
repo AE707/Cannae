@@ -16,15 +16,18 @@ def create_app() -> FastAPI:
         description="MVP: AI-powered business operating system with CEO & Coach agents",
         version="0.1.0",
         debug=settings.debug,
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
     )
 
-    # Add CORS middleware
+    # Add CORS middleware — restrict origins in production
+    allowed_origins = settings.cors_origins
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure appropriately for production
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=allowed_origins,
+        allow_credentials=len(allowed_origins) > 0 and "*" not in allowed_origins,
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
     )
 
     # Include routers

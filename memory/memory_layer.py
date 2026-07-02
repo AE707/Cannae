@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
 import asyncio
 
-from core.config import settings
+from core.config import get_settings
 from memory.vector_store import VectorStore
 from memory.graph_memory import GraphMemory
 

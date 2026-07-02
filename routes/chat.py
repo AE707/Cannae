@@ -1,15 +1,18 @@
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+import logging
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
-import json
 
 from agents.ceo_agent import CEOAgent
 from agents.coach_agent import CoachAgent
 from agents.seo_agent import SEOSAgent
 from agents.cfo_agent import CFOAgent
 from core.config import get_settings
+from core.auth import require_auth
+from core.validation import validate_user_id
 from memory.memory_layer import MemoryLayer
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -20,6 +23,11 @@ class ChatRequest(BaseModel):
     history: Optional[List[Dict[str, Any]]] = []
     agent_type: str = "ceo"  # "ceo", "coach", "seo", or "cfo"
 
+    @field_validator("user_id")
+    @classmethod
+    def check_user_id(cls, v: str) -> str:
+        return validate_user_id(v)
+
 
 class ChatResponse(BaseModel):
     response: str
@@ -27,7 +35,10 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(
+    request: ChatRequest,
+    token_payload: dict = Depends(require_auth),
+):
     """Handle general chat requests with specific agent selection."""
     try:
         settings = get_settings()
@@ -57,13 +68,16 @@ async def chat_endpoint(request: ChatRequest):
             response=response,
             agent_used=request.agent_type,
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("chat_endpoint failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/agents")
 async def list_agents():
-    """List available agents."""
+    """List available agents (public endpoint)."""
     return {
         "agents": ["ceo", "coach", "seo", "cfo"],
         "descriptions": {
