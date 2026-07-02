@@ -1,15 +1,16 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
-import json
 
-from core.config import settings
 from memory.memory_layer import MemoryLayer
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAgent(ABC):
     """Base class for all agents."""
 
-    def __init__(self, memory_layer: MemoryLayer, settings):
+    def __init__(self, memory_layer: MemoryLayer, settings: Any) -> None:
         self.memory_layer = memory_layer
         self.settings = settings
 
@@ -21,18 +22,29 @@ class BaseAgent(ABC):
         pass
 
     async def _build_memory_context(self, user_id: str, query: str) -> str:
-        """Build memory context from both stores."""
-        memory_data = await self.memory_layer.read(user_id, query)
+        """Build memory context from both stores.
 
-        context_parts = []
+        Memory retrieval failures are logged but do not block the agent
+        from responding — it just proceeds without memory context.
+        """
+        try:
+            memory_data = await self.memory_layer.read(user_id, query)
+        except Exception as exc:
+            logger.warning(
+                "Memory retrieval failed for user=%s, proceeding without context: %s",
+                user_id, exc,
+            )
+            return "No relevant memories found."
 
-        # Add semantic memory
+        context_parts: List[str] = []
+
         if memory_data["semantic"]:
             context_parts.append("## Relevant Past Interactions")
             for item in memory_data["semantic"]:
-                context_parts.append(f"- {item['content']} (from {item['metadata'].get('agent_id', 'unknown')})")
+                context_parts.append(
+                    f"- {item['content']} (from {item['metadata'].get('agent_id', 'unknown')})"
+                )
 
-        # Add graph memory
         if memory_data["graph"]:
             context_parts.append("\n## Past Decisions & Patterns")
             for item in memory_data["graph"]:

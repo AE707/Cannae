@@ -1,10 +1,15 @@
+import logging
 from typing import Literal, TypedDict
 from langgraph.graph import StateGraph, END
 
 from agents.ceo_agent import CEOAgent
+from agents.cfo_agent import CFOAgent
 from agents.coach_agent import CoachAgent
+from agents.seo_agent import SEOSAgent
 from core.config import get_settings
 from memory.memory_layer import MemoryLayer
+
+logger = logging.getLogger(__name__)
 
 
 class CouncilState(TypedDict):
@@ -83,20 +88,30 @@ class Council:
         return workflow.compile()
 
     async def _retrieve_memory(self, state: CouncilState) -> CouncilState:
-        """Retrieve memory context for the user's message."""
-        memory_data = await self.memory_layer.read(
-            state["user_id"], state["message"]
-        )
+        """Retrieve memory context for the user's message.
 
-        context_parts = []
+        Memory failures are logged but do not abort the graph — the agent
+        proceeds without context.
+        """
+        try:
+            memory_data = await self.memory_layer.read(
+                state["user_id"], state["message"]
+            )
+        except Exception as exc:
+            logger.warning(
+                "Council memory retrieval failed for user=%s: %s",
+                state["user_id"], exc,
+            )
+            state["memory_context"] = "No relevant memories found."
+            return state
 
-        # Add semantic memory
+        context_parts: list[str] = []
+
         if memory_data["semantic"]:
             context_parts.append("## Relevant Past Interactions")
             for item in memory_data["semantic"]:
                 context_parts.append(f"- {item['content']} (from {item['metadata'].get('agent_id', 'unknown')})")
 
-        # Add graph memory
         if memory_data["graph"]:
             context_parts.append("\n## Past Decisions & Patterns")
             for item in memory_data["graph"]:
@@ -251,7 +266,11 @@ class Council:
             return "end"
 
     async def _write_memory(self, state: CouncilState) -> CouncilState:
-        """Write the interaction to memory."""
+        """Write the interaction to memory.
+
+        Memory write failures are logged but do not prevent returning
+        the final response.
+        """
         # Determine which response to use as final
         if state["handoff_to"] == "ceo":
             state["final_response"] = state["ceo_response"]
@@ -262,7 +281,6 @@ class Council:
         elif state["handoff_to"] == "cfo":
             state["final_response"] = state["cfo_response"]
         else:
-            # If no handoff, use the initially selected agent's response
             if state["agent_choice"] == "ceo":
                 state["final_response"] = state["ceo_response"]
             elif state["agent_choice"] == "coach":
@@ -272,18 +290,23 @@ class Council:
             elif state["agent_choice"] == "cfo":
                 state["final_response"] = state["cfo_response"]
 
-        # Write to memory
-        await self.memory_layer.write(
-            user_id=state["user_id"],
-            content=state["message"],
-            agent_id=state["agent_choice"],
-            metadata={
-                "type": "council_interaction",
-                "handoff_occurred": bool(state["handoff_to"]),
-                "handoff_to": state["handoff_to"],
-                "response_length": len(state["final_response"]),
-            },
-        )
+        try:
+            await self.memory_layer.write(
+                user_id=state["user_id"],
+                content=state["message"],
+                agent_id=state["agent_choice"],
+                metadata={
+                    "type": "council_interaction",
+                    "handoff_occurred": bool(state["handoff_to"]),
+                    "handoff_to": state["handoff_to"],
+                    "response_length": len(state["final_response"]),
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "Council memory write failed for user=%s: %s",
+                state["user_id"], exc,
+            )
 
         return state
 
