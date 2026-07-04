@@ -1,4 +1,7 @@
 import logging
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, field_validator
 from typing import List, Optional, Dict, Any
@@ -8,17 +11,20 @@ from core.config import get_settings
 from core.auth import require_auth
 from core.validation import validate_user_id
 from memory.memory_layer import MemoryLayer
+from services.llm import LLMServiceError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+VALID_AGENT_TYPES = ("ceo", "coach", "seo", "cfo")
 
 
 class ChatRequest(BaseModel):
     user_id: str
     message: str
     history: Optional[List[Dict[str, Any]]] = []
-    agent_type: str = "ceo"  # "ceo", "coach", "seo", or "cfo"
+    agent_type: str = "ceo"
 
     @field_validator("user_id")
     @classmethod
@@ -32,6 +38,14 @@ class ChatResponse(BaseModel):
 
 
 @router.post("/", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest) -> ChatResponse:
+    """Handle general chat requests with specific agent selection."""
+    agent_type = request.agent_type.lower()
+    if agent_type not in VALID_AGENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid agent_type: {request.agent_type}. Must be one of {VALID_AGENT_TYPES}",
+        )
 async def chat_endpoint(
     request: ChatRequest,
     token_payload: dict = Depends(require_auth),
@@ -43,12 +57,48 @@ async def chat_endpoint(
 
         agent = get_agent(request.agent_type.lower(), memory_layer, settings)
 
+    settings = get_settings()
+    memory_layer = MemoryLayer(settings)
+
+    agents = {
+        "ceo": CEOAgent,
+        "coach": CoachAgent,
+        "seo": SEOSAgent,
+        "cfo": CFOAgent,
+    }
+    agent = agents[agent_type](memory_layer, settings)
+
+    try:
         response = await agent.invoke(
             request.user_id,
             request.message,
             request.history or [],
         )
+    except LLMServiceError as exc:
+        logger.error("LLM service error in chat (agent=%s): %s", agent_type, exc)
+        status = 503 if exc.retryable else 502
+        raise HTTPException(
+            status_code=status, detail="AI service temporarily unavailable"
+        ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unexpected error in chat endpoint (agent=%s)", agent_type)
+        raise HTTPException(
+            status_code=500, detail="Internal server error"
+        ) from exc
 
+    return ChatResponse(
+        response=response,
+        agent_used=agent_type,
+    )
+
+
+@router.get("/agents")
+async def list_agents() -> Dict[str, Any]:
+    """List available agents."""
+    return {
+        "agents": list(VALID_AGENT_TYPES),
         return ChatResponse(
             response=response,
             agent_used=request.agent_type,

@@ -1,3 +1,11 @@
+import logging
+from typing import Literal, TypedDict
+from langgraph.graph import StateGraph, END
+
+from agents.ceo_agent import CEOAgent
+from agents.cfo_agent import CFOAgent
+from agents.coach_agent import CoachAgent
+from agents.seo_agent import SEOSAgent
 from typing import Literal, TypedDict, Optional
 from langgraph.graph import StateGraph, END
 
@@ -5,6 +13,8 @@ from agents.base_agent import BaseAgent, format_memory_context
 from core.config import get_settings
 from core.constants import AgentId, HANDOFF_PREFIX, HANDOFF_TARGETS
 from memory.memory_layer import MemoryLayer
+
+logger = logging.getLogger(__name__)
 
 
 class CouncilState(TypedDict):
@@ -116,6 +126,38 @@ class Council:
     # ------------------------------------------------------------------
 
     async def _retrieve_memory(self, state: CouncilState) -> CouncilState:
+        """Retrieve memory context for the user's message.
+
+        Memory failures are logged but do not abort the graph — the agent
+        proceeds without context.
+        """
+        try:
+            memory_data = await self.memory_layer.read(
+                state["user_id"], state["message"]
+            )
+        except Exception as exc:
+            logger.warning(
+                "Council memory retrieval failed for user=%s: %s",
+                state["user_id"], exc,
+            )
+            state["memory_context"] = "No relevant memories found."
+            return state
+
+        context_parts: list[str] = []
+
+        if memory_data["semantic"]:
+            context_parts.append("## Relevant Past Interactions")
+            for item in memory_data["semantic"]:
+                context_parts.append(f"- {item['content']} (from {item['metadata'].get('agent_id', 'unknown')})")
+
+        if memory_data["graph"]:
+            context_parts.append("\n## Past Decisions & Patterns")
+            for item in memory_data["graph"]:
+                context_parts.append(f"- {item['content']} (from {item['agent_id']})")
+
+        state["memory_context"] = (
+            "\n".join(context_parts) if context_parts else "No relevant memories found."
+        )
         """Retrieve memory context for the user's message."""
         memory_data = await self.memory_layer.read(state["user_id"], state["message"])
         state["memory_context"] = format_memory_context(memory_data)
@@ -149,6 +191,48 @@ class Council:
         return "continue" if state["handoff_to"] else "end"
 
     async def _write_memory(self, state: CouncilState) -> CouncilState:
+        """Write the interaction to memory.
+
+        Memory write failures are logged but do not prevent returning
+        the final response.
+        """
+        # Determine which response to use as final
+        if state["handoff_to"] == "ceo":
+            state["final_response"] = state["ceo_response"]
+        elif state["handoff_to"] == "coach":
+            state["final_response"] = state["coach_response"]
+        elif state["handoff_to"] == "seo":
+            state["final_response"] = state["seo_response"]
+        elif state["handoff_to"] == "cfo":
+            state["final_response"] = state["cfo_response"]
+        else:
+            if state["agent_choice"] == "ceo":
+                state["final_response"] = state["ceo_response"]
+            elif state["agent_choice"] == "coach":
+                state["final_response"] = state["coach_response"]
+            elif state["agent_choice"] == "seo":
+                state["final_response"] = state["seo_response"]
+            elif state["agent_choice"] == "cfo":
+                state["final_response"] = state["cfo_response"]
+
+        try:
+            await self.memory_layer.write(
+                user_id=state["user_id"],
+                content=state["message"],
+                agent_id=state["agent_choice"],
+                metadata={
+                    "type": "council_interaction",
+                    "handoff_occurred": bool(state["handoff_to"]),
+                    "handoff_to": state["handoff_to"],
+                    "response_length": len(state["final_response"]),
+                },
+            )
+        except Exception as exc:
+            logger.error(
+                "Council memory write failed for user=%s: %s",
+                state["user_id"], exc,
+            )
+
         """Write the interaction to memory and set final response."""
         state["final_response"] = state["response"]
 
