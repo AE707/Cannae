@@ -2,8 +2,6 @@ import logging
 from typing import List, Dict, Any
 
 from agents.base_agent import BaseAgent
-from core.constants import CLAUDE_MODEL, MAX_TOKENS
-from services.llm import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ Your memory spans all interactions, allowing you to spot patterns in what conten
 Remember: The best SEO strategies create long-term authority and compounding returns over time."""
 
 
-class SEOSAgent(BaseAgent):
+class SEOAgent(BaseAgent):
     """SEO agent for search engine optimization and content strategy."""
 
     def __init__(self, memory_layer: Any, settings: Any) -> None:
@@ -88,3 +86,5 @@ class SEOSAgent(BaseAgent):
             temperature=0.7
         )
         return response["content"]
+    agent_id = "seo"
+    system_prompt = SEO_SYSTEM_PROMPT

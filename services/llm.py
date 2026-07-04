@@ -369,9 +369,23 @@ class LLMService:
         temperature: float = 0.7,
     ) -> Dict[str, Any]:
         """Delegate to the underlying service implementation."""
+        """Delegate to the underlying provider service."""
         return await self.service.create_message(
             messages=messages, model=model, max_tokens=max_tokens, temperature=temperature
         )
+
+    async def create_message_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: float = 0.7,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Delegate streaming to the underlying provider service."""
+        async for chunk in self.service.create_message_stream(
+            messages=messages, model=model, max_tokens=max_tokens, temperature=temperature
+        ):
+            yield chunk
 
     async def generate(self, prompt: str, system_prompt: Optional[str] = None) -> str:
         """Generate a response from a prompt (legacy interface)."""

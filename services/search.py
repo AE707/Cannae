@@ -17,6 +17,7 @@ class SearchService:
         self.settings = get_settings()
         self.tavily_api_key = getattr(self.settings, "tavily_api_key", None)
         self.searxng_url = getattr(self.settings, "searxng_url", "https://searx.be")
+        self.use_tavily = bool(self.settings.tavily_api_key)
 
     async def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """Perform web search and return results.
@@ -29,6 +30,25 @@ class SearchService:
 
     async def _search_tavily(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Search using Tavily API.
+        """Search using Tavily API."""
+        api_key = self.settings.tavily_api_key
+        if not api_key:
+            return []
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.tavily.com/search",
+                json={
+                    "api_key": api_key,
+                    "query": query,
+                    "max_results": max_results,
+                    "search_depth": "advanced",
+                    "include_answer": True,
+                    "include_raw_content": False,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
 
         Raises SearchServiceError on HTTP or connection failures.
         """
@@ -70,6 +90,9 @@ class SearchService:
                 "score": result.get("score", 0.0),
             })
         return results
+    async def _search_searxng(self, query: str, max_results: int) -> List[Dict[str, Any]]:
+        """Search using SearXNG instance."""
+        searxng_url = self.settings.searxng_url
 
     async def _search_searxng(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Search using SearXNG instance.
@@ -113,3 +136,15 @@ class SearchService:
                 "score": 1.0 - (idx / total) if total > 0 else 0.5,
             })
         return results
+            all_results = data.get("results", [])
+            results = []
+            for i, result in enumerate(all_results[:max_results]):
+                results.append(
+                    {
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "content": result.get("content", ""),
+                        "score": 1.0 - (i / len(all_results)) if all_results else 0.5,
+                    }
+                )
+            return results

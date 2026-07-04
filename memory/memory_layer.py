@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Optional
 import asyncio
 import logging
 
+from core.config import get_settings
 from memory.vector_store import VectorStore
 from memory.graph_memory import GraphMemory
 

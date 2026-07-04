@@ -2,8 +2,6 @@ import logging
 from typing import List, Dict, Any
 
 from agents.base_agent import BaseAgent
-from core.constants import CLAUDE_MODEL, MAX_TOKENS
-from services.llm import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -87,3 +85,5 @@ class CoachAgent(BaseAgent):
             temperature=0.7
         )
         return response["content"]
+    agent_id = "coach"
+    system_prompt = COACH_SYSTEM_PROMPT
