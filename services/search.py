@@ -1,4 +1,3 @@
-import os
 import httpx
 from typing import List, Dict, Any
 from core.config import get_settings
@@ -9,7 +8,7 @@ class SearchService:
 
     def __init__(self):
         self.settings = get_settings()
-        self.use_tavily = bool(os.getenv("TAVILY_API_KEY"))
+        self.use_tavily = bool(self.settings.tavily_api_key)
 
     async def search(self, query: str, max_results: int = 5) -> List[Dict[str, Any]]:
         """Perform web search and return results."""
@@ -20,7 +19,7 @@ class SearchService:
 
     async def _search_tavily(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Search using Tavily API."""
-        api_key = os.getenv("TAVILY_API_KEY")
+        api_key = self.settings.tavily_api_key
         if not api_key:
             return []
 
@@ -53,8 +52,7 @@ class SearchService:
 
     async def _search_searxng(self, query: str, max_results: int) -> List[Dict[str, Any]]:
         """Search using SearXNG instance."""
-        # Use a public SearXNG instance or self-hosted
-        searxng_url = os.getenv("SEARXNG_URL", "https://searx.be")
+        searxng_url = self.settings.searxng_url
 
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -67,14 +65,15 @@ class SearchService:
             response.raise_for_status()
             data = response.json()
 
+            all_results = data.get("results", [])
             results = []
-            for result in data.get("results", [])[:max_results]:
+            for i, result in enumerate(all_results[:max_results]):
                 results.append(
                     {
                         "title": result.get("title", ""),
                         "url": result.get("url", ""),
                         "content": result.get("content", ""),
-                        "score": 1.0 - (i / len(data.get("results", []))) if data.get("results") else 0.5,
+                        "score": 1.0 - (i / len(all_results)) if all_results else 0.5,
                     }
                 )
             return results

@@ -115,10 +115,17 @@ async function sendMessage() {
 function addMessage(type, content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
-    messageDiv.innerHTML = `
-        <div class="message-content">${content}</div>
-        <div class="message-meta">${type === 'user' ? 'You' : 'Agent'} • ${formatTimestamp(new Date())}</div>
-    `;
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = content;
+
+    const metaDiv = document.createElement('div');
+    metaDiv.className = 'message-meta';
+    metaDiv.textContent = `${type === 'user' ? 'You' : 'Agent'} \u2022 ${formatTimestamp(new Date())}`;
+
+    messageDiv.appendChild(contentDiv);
+    messageDiv.appendChild(metaDiv);
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }

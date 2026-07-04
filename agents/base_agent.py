@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
 from core.constants import CLAUDE_MODEL, MAX_TOKENS, AgentId
+from core.config import get_settings
 from memory.memory_layer import MemoryLayer
 from services.llm import LLMService
 
