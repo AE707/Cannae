@@ -4,9 +4,17 @@ from typing import Literal
 CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
 MAX_TOKENS: int = 4096
 
-# Agent names
-CEO_AGENT: Literal["ceo"] = "ceo"
-COACH_AGENT: Literal["coach"] = "coach"
+# Agent ID type — single source of truth for all agent identifiers
+AgentId = Literal["ceo", "coach", "seo", "cfo"]
 
-# Agent ID type
-AgentId = Literal["ceo", "coach"]
+# Handoff marker format used in agent responses
+HANDOFF_PREFIX = "[HANDOFF→"
+HANDOFF_SUFFIX = "]"
+
+# Map from handoff marker target to AgentId
+HANDOFF_TARGETS: dict[str, "AgentId"] = {
+    "CEO": "ceo",
+    "COACH": "coach",
+    "SEO": "seo",
+    "CFO": "cfo",
+}
