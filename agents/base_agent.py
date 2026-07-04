@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 import json
 
-from core.config import settings
+from core.config import get_settings
 from memory.memory_layer import MemoryLayer
 
 
