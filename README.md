@@ -164,19 +164,19 @@ All successful responses follow `{ "data": …, "error": null }`. Errors return 
 
 ## 📈 Current Build Status (from CLAUDE.md)
 
-- [ ] Project scaffold (folders, requirements.txt, app.py shell)
-- [ ] core/config.py + core/constants.py
-- [ ] memory/vector_store.py (ChromaDB)
-- [ ] memory/graph_memory.py (Mem0)
-- [ ] memory/memory_layer.py (unified)
-- [ ] agents/base_agent.py
-- [ ] agents/ceo_agent.py (system prompt + invoke)
-- [ ] agents/coach_agent.py
-- [ ] agents/council.py (LangGraph graph)
-- [ ] routes/council.py
-- [ ] app.py (full, with all routers)
-- [ ] static/index.html + council.js
-- [ ] .env.example + requirements.txt
+- [x] Project scaffold (folders, requirements.txt, app.py shell)
+- [x] core/config.py + core/constants.py
+- [x] memory/vector_store.py (ChromaDB)
+- [x] memory/graph_memory.py (Mem0)
+- [x] memory/memory_layer.py (unified)
+- [x] agents/base_agent.py
+- [x] agents/ceo_agent.py (system prompt + invoke)
+- [x] agents/coach_agent.py
+- [x] agents/council.py (LangGraph graph)
+- [x] routes/council.py
+- [x] app.py (full, with all routers)
+- [x] static/index.html + council.js
+- [x] .env.example + requirements.txt
 
 *(Check the latest `CLAUDE.md` for updates.)*
 
